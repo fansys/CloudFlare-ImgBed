@@ -9,9 +9,16 @@ export async function onRequest(context) {
       data, // arbitrary space for passing data between middlewares
     } = context;
     console.log(env)
-    console.log(params.id)
-    await env.img_url.delete(params.id);
-    const info = JSON.stringify(params.id);
+    const key = params.id.join('/');
+    console.log(key)
+    //read the metadata
+    const value = await env.img_url.getWithMetadata(key);
+    console.log(value)
+    //"metadata":{"TimeStamp":19876541,"ListType":"None","rating_label":"None"}
+    //change the metadata
+    value.metadata.ListType = "Block"
+    await env.img_url.put(key,"",{metadata: value.metadata});
+    const info = JSON.stringify(value.metadata);
     return new Response(info);
 
   }

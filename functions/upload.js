@@ -28,6 +28,43 @@ function getCookieValue(cookies, name) {
     return match ? decodeURIComponent(match[2]) : null;
 }
 
+const imageMimeTypes = {
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'svg': 'image/svg+xml',
+    'bmp': 'image/bmp',
+    'webp': 'image/webp',
+    'ico': 'image/x-icon',
+    'tiff': 'image/tiff',
+    'avif': 'image/avif'
+  };
+  
+function getExt(filename) {
+    return filename.split('.').pop() || 'jpg';
+  }
+
+function getMimeType(ext) {
+    return imageMimeTypes[ext] || 'image/jpeg';
+}
+
+function genFileKey(ext) {
+    // 生成日期字符串
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateString = `${year}${month}${day}`;
+    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let randomFileName = '';
+    const charactersLength = characters.length;
+    for (let i = 0; i < 16; i++) {
+        randomFileName += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return `${year}${month}${day}/${randomFileName}.${ext}`;
+}
+
 export async function onRequestPost(context) {  // Contents of context object
     const { request, env, params, waitUntil, next, data } = context;
     const url = new URL(request.url);
@@ -60,8 +97,6 @@ export async function onRequestPost(context) {  // Contents of context object
         return new UnauthorizedException("error");
     }
     const clonedRequest = request.clone();
-    await errorHandling(context);
-    telemetryData(context);
     // 构建目标 URL 时剔除 authCode 参数
     const targetUrl = new URL(url.pathname, 'https://telegra.ph');
     url.searchParams.forEach((value, key) => {
@@ -72,46 +107,30 @@ export async function onRequestPost(context) {  // Contents of context object
     // 复制请求头并剔除 authCode
     const headers = new Headers(clonedRequest.headers);
     headers.delete('authCode');
-    const response = await fetch(targetUrl.href, {
-        method: clonedRequest.method,
-        headers: headers,
-        body: clonedRequest.body,
-    });
-    try {
-        const clonedRes = await response.clone().json(); // 等待响应克隆和解析完成
-        const time = new Date().getTime();
-        const src = clonedRes[0].src;
-        const id = src.split('/').pop();
-        const img_url = env.img_url;
-        const apikey = env.ModerateContentApiKey;
-    
-        if (img_url == undefined || img_url == null || img_url == "") {
-            // img_url 未定义或为空的处理逻辑
-        } else {
-            if (apikey == undefined || apikey == null || apikey == "") {
-                await env.img_url.put(id, "", {
-                    metadata: { ListType: "None", Label: "None", TimeStamp: time },
-                });
-            } else {
-                try {
-                    const fetchResponse = await fetch(`https://api.moderatecontent.com/moderate/?key=${apikey}&url=https://telegra.ph/${src}`);
-                    if (!fetchResponse.ok) {
-                        throw new Error(`HTTP error! status: ${fetchResponse.status}`);
-                    }
-                    const moderate_data = await fetchResponse.json();
-                    await env.img_url.put(id, "", {
-                        metadata: { ListType: "None", Label: moderate_data.rating_label, TimeStamp: time },
-                    });
-                } catch (error) {
-                    console.error('Moderate Error:', error);
-                } finally {
-                    console.log('Moderate Done');
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Error:', error);
-    } finally {
-        return response;
+
+    const formData = await request.formData();
+    const file = formData.get('file'); // 'file' 是表单中的文件字段名称
+    if (!file) {
+      return new Response('No file uploaded', { status: 400 });
     }
+    const ext = getExt(file.name);
+    const mimeType = getMimeType(ext);
+
+    const fileBuffer = await file.arrayBuffer();
+    const fileContent = new Uint8Array(fileBuffer);
+
+    const key  = genFileKey(ext);
+    const res = await env.R2.put(key, fileContent, {
+        'Content-Type': mimeType,
+    });
+    const time = new Date().getTime();
+
+    console.log('id', res.key)
+    await env.img_url.put(res.key, "", {
+        metadata: { ListType: "None", Label: "None", TimeStamp: time },
+    });
+    const result = [{
+        src: `/file/${res.key}`
+    }]
+    return new Response(JSON.stringify(result), { status: 200 });
 }

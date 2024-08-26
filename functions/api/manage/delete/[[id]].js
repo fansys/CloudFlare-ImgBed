@@ -9,15 +9,10 @@ export async function onRequest(context) {
       data, // arbitrary space for passing data between middlewares
     } = context;
     console.log(env)
-    console.log(params.id)
-    //read the metadata
-    const value = await env.img_url.getWithMetadata(params.id);
-    console.log(value)
-    //"metadata":{"TimeStamp":19876541,"ListType":"None","rating_label":"None"}
-    //change the metadata
-    value.metadata.ListType = "White"
-    await env.img_url.put(params.id,"",{metadata: value.metadata});
-    const info = JSON.stringify(value.metadata);
+    const key = params.id.join('/');
+    console.log(key)
+    await env.img_url.delete(key);
+    const info = JSON.stringify(key);
     return new Response(info);
 
   }

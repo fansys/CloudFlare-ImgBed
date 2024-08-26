@@ -2,6 +2,7 @@ import sentryPlugin from "@cloudflare/pages-plugin-sentry";
 import '@sentry/tracing';
 
 export async function errorHandling(context) {
+  /*
   const env = context.env;
   if (typeof env.disable_telemetry == "undefined" || env.disable_telemetry == null || env.disable_telemetry == "") {
     context.data.telemetry = true;
@@ -19,11 +20,12 @@ export async function errorHandling(context) {
       dsn: "https://44b7b443108ec6d298044b125ff89d28@o4507644548022272.ingest.us.sentry.io/4507644555100160",
       tracesSampleRate: sampleRate,
     })(context);;
-  }
+  }*/
   return context.next();
 }
 
 export function telemetryData(context) {
+  /*
   const env = context.env;
   if (typeof env.disable_telemetry == "undefined" || env.disable_telemetry == null || env.disable_telemetry == "") {
     try {
@@ -71,7 +73,7 @@ export function telemetryData(context) {
     } finally {
       context.data.transaction.finish();
     }
-  }
+  }*/
   return context.next();
 }
 
